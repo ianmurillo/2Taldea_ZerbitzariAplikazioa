@@ -197,7 +197,7 @@ fun MainScreen(navController: NavHostController, username: String) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.logo_michisuji),
+                    painter = painterResource(id = R.drawable.logo_michisuji), // Asegúrate de usar tu logo
                     contentDescription = "Logo",
                     modifier = Modifier.size(100.dp)
                 )
@@ -239,7 +239,10 @@ fun MainScreen(navController: NavHostController, username: String) {
         // Botón de cerrar sesión
         Button(
             onClick = {
-                navController.navigate("login_screen")
+                navController.navigate("login_screen") {
+                    // Borramos las pantallas anteriores de la pila para que no se pueda volver al MainScreen
+                    popUpTo("login_screen") { inclusive = true }
+                }
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
             modifier = Modifier
