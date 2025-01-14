@@ -44,17 +44,30 @@ fun MyApp() {
     val navController = rememberNavController()
 
     NavHost(navController = navController, startDestination = "login_screen") {
-        composable("login_screen") {
-            LoginScreen(navController = navController)
-        }
+        composable("login_screen") { LoginScreen(navController = navController) }
         composable("main_screen/{username}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             MainScreen(navController = navController, username = username)
         }
-        composable("mesa_screen") {
-            // Aquí va tu pantalla de mesa_screen
+        composable("mesa_screen/{username}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            MesaScreen(navController = navController, username = username)
+        }
+        composable("bebida_screen/{username}/{mesa}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
+            BebidaScreen(navController = navController, username = username, mesa = mesa)
         }
         composable("eskaerak_screen") {
+            // Aquí va tu pantalla de eskaerak_screen
+        }
+        composable("lehenengoa_screen") {
+            // Aquí va tu pantalla de eskaerak_screen
+        }
+        composable("bigarrena_screen") {
+            // Aquí va tu pantalla de eskaerak_screen
+        }
+        composable("laburpena_screen") {
             // Aquí va tu pantalla de eskaerak_screen
         }
         composable("txata_screen") {
@@ -75,7 +88,7 @@ fun LoginScreen(navController: NavHostController) {
     val hintColor = Color(0xFFF8F3E9)
 
     // Definición de las variables de estado
-    var username by remember { mutableStateOf("") }
+        var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
 
@@ -217,10 +230,10 @@ fun MainScreen(navController: NavHostController, username: String) {
                 listOf("Komandak", "Eskaerak", "Txata").forEach { label ->
                     Button(
                         onClick = {
-                            when (label) {
-                                "Komandak" -> navController.navigate("mesa_screen")
-                                "Eskaerak" -> navController.navigate("eskaerak_screen")
-                                "Txata" -> navController.navigate("txata_screen")
+                            if (label == "Komandak") {
+                                navController.navigate("mesa_screen/$username") // Pasar el nombre de usuario
+                            } else {
+                                // Otras acciones para "Eskaerak" y "Txata"
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
@@ -257,8 +270,9 @@ fun MainScreen(navController: NavHostController, username: String) {
 }
 
 
+
 @Composable
-fun MesaScreen(navController: NavHostController) {
+fun MesaScreen(navController: NavHostController, username: String) {
     // Colores
     val backgroundColor = Color(0xFFBFAB92)
     val buttonColor = Color(0xFF69472C)
@@ -287,7 +301,7 @@ fun MesaScreen(navController: NavHostController) {
 
             // Nombre del usuario en la esquina superior derecha
             Text(
-                text = "Izena", // Cambia esto para que refleje el nombre del usuario registrado
+                text = username, // Mostrar el nombre de usuario
                 color = Color(0xFF1C1107),
                 fontSize = 20.sp
             )
@@ -317,7 +331,9 @@ fun MesaScreen(navController: NavHostController) {
                     for (col in 1..2) { // 2 botones por fila
                         val tableNumber = row * 2 + col
                         Button(
-                            onClick = { /* Acción del botón de mesa */ },
+                            onClick = {
+                                navController.navigate("bebida_screen/${username}/Mesa $tableNumber")
+                            },
                             colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
                             modifier = Modifier
                                 .size(100.dp), // Tamaño cuadrado para los botones
@@ -332,7 +348,7 @@ fun MesaScreen(navController: NavHostController) {
 
         // Botón "Atzera" abajo a la izquierda
         Button(
-            onClick = { navController.popBackStack() }, // Volver a la pantalla anterior
+            onClick = { navController.popBackStack() }, // Volver a la pantalla anterior (MainScreen)
             colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
             modifier = Modifier
                 .align(Alignment.BottomStart) // Alineación abajo a la izquierda
@@ -345,7 +361,9 @@ fun MesaScreen(navController: NavHostController) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+
+
+
 @Composable
 fun BebidaScreen(navController: NavHostController, username: String, mesa: String) {
     // Colores
@@ -454,7 +472,7 @@ fun BebidaScreen(navController: NavHostController, username: String, mesa: Strin
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Atzera", color = Color.White, fontSize = 16.sp)
-                } 
+                }
                 Button(
                     onClick = { /* Acción de "Hurrengoa" */ },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF69472C)),
@@ -522,6 +540,7 @@ fun BebidaCard(
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1148,22 +1167,22 @@ fun MainScreenPreview() {
 @Composable
 fun MesaScreenPreview() {
     val navController = rememberNavController()
-    MesaScreen(navController = navController)
+    // Simulamos el nombre de usuario que se pasa desde el Login
+    val username = "Izena"
+    MesaScreen(navController = navController, username = username)
 }
+
 
 @Preview(showBackground = true)
 @Composable
 fun BebidaScreenPreview() {
-    // Fake NavController para el Preview
-    val fakeNavController = rememberNavController()
-
-    // Llamamos a la función principal con datos ficticios
-    BebidaScreen(
-        navController = fakeNavController,
-        username = "Izena",
-        mesa = "Mahai 1"
-    )
+    val navController = rememberNavController()
+    // Simulamos el nombre de usuario y el número de mesa seleccionada
+    val username = "Izena"
+    val mesa = "Mesa 1"  // La mesa elegida por el usuario
+    BebidaScreen(navController = navController, username = username, mesa = mesa)
 }
+
 
 @Preview(showBackground = true)
 @Composable
