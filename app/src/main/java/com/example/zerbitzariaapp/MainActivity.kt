@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key.Companion
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -23,15 +24,46 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MainApp()
+            MyApp()
         }
     }
 }
+
+@Composable
+fun MyApp() {
+    val navController = rememberNavController()
+
+    NavHost(navController = navController, startDestination = "login_screen") {
+        composable("login_screen") {
+            LoginScreen(navController = navController)
+        }
+        composable("main_screen/{username}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            MainScreen(navController = navController, username = username)
+        }
+        composable("mesa_screen") {
+            // Aquí va tu pantalla de mesa_screen
+        }
+        composable("eskaerak_screen") {
+            // Aquí va tu pantalla de eskaerak_screen
+        }
+        composable("txata_screen") {
+            // Aquí va tu pantalla de txata_screen
+        }
+    }
+}
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,8 +74,10 @@ fun LoginScreen(navController: NavHostController) {
     val buttonColor = Color(0xFF69472C)
     val hintColor = Color(0xFFF8F3E9)
 
+    // Definición de las variables de estado
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
 
     // Diseño principal
     Box(
@@ -58,7 +92,6 @@ fun LoginScreen(navController: NavHostController) {
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxWidth()
         ) {
-
             Image(
                 painter = painterResource(id = R.drawable.logo_michisuji), // Reemplaza con tu recurso
                 contentDescription = "Logo",
@@ -112,13 +145,18 @@ fun LoginScreen(navController: NavHostController) {
                     .padding(bottom = 16.dp)
             )
 
+            // Mostrar error si los campos están vacíos
+            if (errorMessage.isNotEmpty()) {
+                Text(text = errorMessage, color = Color.Red, fontSize = 14.sp)
+            }
+
             // Botón de Inicio de Sesión
             Button(
                 onClick = {
                     if (username.isNotBlank() && password.isNotBlank()) {
-                        navController.navigate("main_screen")
+                        navController.navigate("main_screen/$username")
                     } else {
-                        // Mostrar mensaje de error si los campos están vacíos
+                        errorMessage = "Por favor, ingrese un nombre de usuario y una contraseña."
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
@@ -132,16 +170,7 @@ fun LoginScreen(navController: NavHostController) {
     }
 }
 
-@Composable
-fun MainApp() {
-    val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "login_screen") {
-        composable("login_screen") { LoginScreen(navController) }
-        composable("main_screen") { MainScreen(navController, username = "Izena") }
-        composable("mesa_screen") { MesaScreen(navController) }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -159,6 +188,7 @@ fun MainScreen(navController: NavHostController, username: String) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
+            // Barra superior con logo y nombre de usuario
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -172,12 +202,13 @@ fun MainScreen(navController: NavHostController, username: String) {
                     modifier = Modifier.size(100.dp)
                 )
                 Text(
-                    text = username,
+                    text = username, // Mostramos el nombre de usuario aquí
                     color = Color(0xFF1C1107),
                     fontSize = 20.sp
                 )
             }
 
+            // Opciones del menú principal
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
@@ -186,8 +217,10 @@ fun MainScreen(navController: NavHostController, username: String) {
                 listOf("Komandak", "Eskaerak", "Txata").forEach { label ->
                     Button(
                         onClick = {
-                            if (label == "Komandak") {
-                                navController.navigate("mesa_screen")
+                            when (label) {
+                                "Komandak" -> navController.navigate("mesa_screen")
+                                "Eskaerak" -> navController.navigate("eskaerak_screen")
+                                "Txata" -> navController.navigate("txata_screen")
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
@@ -203,8 +236,11 @@ fun MainScreen(navController: NavHostController, username: String) {
             }
         }
 
+        // Botón de cerrar sesión
         Button(
-            onClick = { navController.navigate("login_screen") },
+            onClick = {
+                navController.navigate("login_screen")
+            },
             colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -216,6 +252,7 @@ fun MainScreen(navController: NavHostController, username: String) {
         }
     }
 }
+
 
 @Composable
 fun MesaScreen(navController: NavHostController) {
@@ -940,7 +977,153 @@ fun ResumenPedidoScreen(navController: NavHostController, pedido: List<Pair<Stri
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatScreen(navController: NavHostController, mensajes: List<Pair<String, Boolean>>) {
+    // Colores del diseño
+    val backgroundColor = Color(0xFFBFAB92)
+    val bubbleColorSender = Color(0xFF69472C)
+    val bubbleColorReceiver = Color(0xFFF8F3E9)
+    val textColorSender = Color(0xFFF8F3E9)
+    val textColorReceiver = Color(0xFF1C1107)
 
+    // Estado para el texto del mensaje
+    var messageText by remember { mutableStateOf("") }
+    var chatMessages by remember { mutableStateOf(mensajes) }
+
+    // Función para enviar mensaje
+    fun sendMessage() {
+        if (messageText.isNotEmpty()) {
+            chatMessages = listOf(Pair(messageText, true)) + chatMessages
+            messageText = ""  // Limpiar el campo de texto después de enviar
+        }
+    }
+
+    // Pantalla principal
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundColor)
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Encabezado del chat
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.logo_michisuji),
+                    contentDescription = "Logo",
+                    modifier = Modifier.size(50.dp)
+                )
+                Text(
+                    text = "Chat",
+                    color = Color(0xFF1C1107),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Button(
+                    onClick = { navController.popBackStack() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Atzera", color = Color.White)
+                }
+            }
+
+            // Lista de mensajes
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(bottom = 16.dp),
+                reverseLayout = true // Muestra los mensajes desde el final
+            ) {
+                items(chatMessages) { mensaje ->
+                    ChatBubble(
+                        mensaje = mensaje.first,
+                        isSender = mensaje.second,
+                        bubbleColorSender = bubbleColorSender,
+                        bubbleColorReceiver = bubbleColorReceiver,
+                        textColorSender = textColorSender,
+                        textColorReceiver = textColorReceiver
+                    )
+                }
+            }
+
+            // Input de texto
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF69472C), shape = RoundedCornerShape(16.dp))
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    placeholder = { Text("Idatzi mezua...", color = Color(0xFFF8F3E9)) },
+                    colors = TextFieldDefaults.textFieldColors(
+                        containerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { sendMessage() },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Send,
+                        contentDescription = "Bidali",
+                        tint = Color(0xFF4CAF50)
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+fun ChatBubble(
+    mensaje: String,
+    isSender: Boolean,
+    bubbleColorSender: Color,
+    bubbleColorReceiver: Color,
+    textColorSender: Color,
+    textColorReceiver: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = if (isSender) Arrangement.End else Arrangement.Start
+    ) {
+        Box(
+            modifier = Modifier
+                .background(
+                    color = if (isSender) bubbleColorSender else bubbleColorReceiver,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(12.dp)
+                .widthIn(max = 300.dp)
+        ) {
+            Text(
+                text = mensaje,
+                color = if (isSender) textColorSender else textColorReceiver,
+                fontSize = 16.sp
+            )
+        }
+    }
+}
 
 
 
@@ -1029,5 +1212,24 @@ fun ResumenPedidoPreview() {
         precioTotal = precioTotalEjemplo
     )
 }
+
+@Preview(showBackground = true)
+@Composable
+fun PreviewChatScreen() {
+    // Lista de mensajes inicial
+    val mensajes = listOf(
+        Pair("¡Hola!", true),
+        Pair("Hola, ¿cómo estás?", false),
+        Pair("Todo bien, gracias", true),
+        Pair("Me alegro", false)
+    )
+
+    ChatScreen(
+        navController = rememberNavController(),
+        mensajes = mensajes
+    )
+}
+
+
 
 
