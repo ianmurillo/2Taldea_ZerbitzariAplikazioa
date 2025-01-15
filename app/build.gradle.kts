@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.recyclerview)
     implementation(libs.firebase.database.ktx)
+    implementation(libs.volley)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -62,5 +63,11 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    implementation ("io.ktor:ktor-client-core:2.3.0")
+    implementation ("io.ktor:ktor-client-android:2.3.0")
+    implementation ("io.ktor:ktor-client-json:2.3.0")
+    implementation ("io.ktor:ktor-client-serialization:2.3.0")
+    implementation ("com.android.volley:volley:1.2.1")
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.0")
 }
 

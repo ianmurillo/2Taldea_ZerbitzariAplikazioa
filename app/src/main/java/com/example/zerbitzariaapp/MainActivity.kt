@@ -28,6 +28,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import com.android.volley.Request
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import org.json.JSONObject
 
 
 class MainActivity : ComponentActivity() {
@@ -44,7 +52,11 @@ fun MyApp() {
     val navController = rememberNavController()
 
     NavHost(navController = navController, startDestination = "login_screen") {
-        composable("login_screen") { LoginScreen(navController = navController) }
+        composable("login_screen") {
+            // Pasamos el 'context' de la actividad (usando 'LocalContext.current') a LoginScreen
+            val context = LocalContext.current
+            LoginScreen(navController = navController, context = context)
+        }
         composable("main_screen/{username}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             MainScreen(navController = navController, username = username)
@@ -95,11 +107,9 @@ fun MyApp() {
     }
 }
 
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(navController: NavHostController) {
+fun LoginScreen(navController: NavHostController, context: Context) {
     // Colores de la paleta
     val backgroundColor = Color(0xFFBFAB92)
     val textColor = Color(0xFF1C1107)
@@ -107,9 +117,13 @@ fun LoginScreen(navController: NavHostController) {
     val hintColor = Color(0xFFF8F3E9)
 
     // Definición de las variables de estado
-        var username by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+
+    // Obtén el alcance de la corutina (esto te permite hacer operaciones asíncronas)
+    val coroutineScope = rememberCoroutineScope()
 
     // Diseño principal
     Box(
@@ -186,7 +200,23 @@ fun LoginScreen(navController: NavHostController) {
             Button(
                 onClick = {
                     if (username.isNotBlank() && password.isNotBlank()) {
-                        navController.navigate("main_screen/$username")
+                        loading = true
+                        // Llamada a loginUser dentro de la corutina
+                        coroutineScope.launch {
+                            loginUser(
+                                context = context, // Pasamos el contexto
+                                username = username,
+                                password = password,
+                                onSuccess = {
+                                    loading = false
+                                    navController.navigate("main_screen/$username")
+                                },
+                                onError = {
+                                    loading = false
+                                    errorMessage = it
+                                }
+                            )
+                        }
                     } else {
                         errorMessage = "Por favor, ingrese un nombre de usuario y una contraseña."
                     }
@@ -198,8 +228,51 @@ fun LoginScreen(navController: NavHostController) {
             ) {
                 Text("Saioa hasi", color = hintColor, fontSize = 16.sp)
             }
+
+            // Mostrar indicador de carga mientras se hace la solicitud
+            if (loading) {
+                CircularProgressIndicator(color = buttonColor)
+            }
         }
     }
+}
+
+// Función que realiza la solicitud HTTP
+fun loginUser(
+    context: Context,
+    username: String,
+    password: String,
+    onSuccess: (String) -> Unit,
+    onError: (String) -> Unit
+) {
+    val url = "http://10.0.2.2/login.php" // Reemplaza con tu URL
+    val json = JSONObject()
+    json.put("username", username)
+    json.put("password", password)
+
+    val requestQueue = Volley.newRequestQueue(context)
+    val stringRequest = object : StringRequest(
+        Request.Method.POST, url,
+        { response ->
+            if (response == "success") {
+                onSuccess(response) // Llamar a la función onSuccess si el login es exitoso
+            } else {
+                onError("Usuario o contraseña incorrectos.")
+            }
+        },
+        { error ->
+            onError("Error de conexión.")
+        }
+    ) {
+        override fun getParams(): Map<String, String> {
+            return mapOf(
+                "username" to username,
+                "password" to password
+            )
+        }
+    }
+
+    requestQueue.add(stringRequest)
 }
 
 
@@ -1194,7 +1267,12 @@ fun ChatBubble(
 @Composable
 fun LoginScreenPreview() {
     val navController = rememberNavController()
-    LoginScreen(navController)
+
+    // Simulamos el contexto en la vista previa
+    val context = LocalContext.current
+
+    // Pasamos el contexto simulado al Composable
+    LoginScreen(navController = navController, context = context)
 }
 
 @Preview(showBackground = true)
