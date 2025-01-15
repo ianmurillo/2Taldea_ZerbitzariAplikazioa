@@ -58,20 +58,39 @@ fun MyApp() {
             val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
             BebidaScreen(navController = navController, username = username, mesa = mesa)
         }
-        composable("eskaerak_screen") {
-            // Aquí va tu pantalla de eskaerak_screen
+        composable("primerosPlatosScreen/{username}/{mesa}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
+            PrimerosPlatosScreen(navController = navController, username = username, mesa = mesa)
         }
-        composable("lehenengoa_screen") {
-            // Aquí va tu pantalla de eskaerak_screen
+        composable("segundosPlatosScreen/{username}/{mesa}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
+            SegundosPlatosScreen(navController = navController, username = username, mesa = mesa)
         }
-        composable("bigarrena_screen") {
-            // Aquí va tu pantalla de eskaerak_screen
-        }
-        composable("laburpena_screen") {
-            // Aquí va tu pantalla de eskaerak_screen
+        composable("resumenPedidoScreen/{username}/{mesa}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
+            val pedido = listOf( // Ejemplo de pedido, reemplazar con los datos reales
+                "Labeko Oilaskoa" to 2,
+                "Legatza Plantxan" to 1
+            )
+            val precioTotal = pedido.sumOf { (_, cantidad) -> cantidad * 10.0 } // Precio ficticio
+
+            ResumenPedidoScreen(
+                navController = navController,
+                pedido = pedido,
+                precioTotal = precioTotal
+            )
         }
         composable("txata_screen") {
             // Aquí va tu pantalla de txata_screen
+        }
+        composable("chat_screen") { backStackEntry ->
+            ChatScreen(
+                navController = navController,
+                mensajes = listOf(Pair("Hola!", true), Pair("¿Cómo estás?", false))
+            )
         }
     }
 }
@@ -230,10 +249,17 @@ fun MainScreen(navController: NavHostController, username: String) {
                 listOf("Komandak", "Eskaerak", "Txata").forEach { label ->
                     Button(
                         onClick = {
-                            if (label == "Komandak") {
-                                navController.navigate("mesa_screen/$username") // Pasar el nombre de usuario
-                            } else {
-                                // Otras acciones para "Eskaerak" y "Txata"
+                            when (label) {
+                                "Komandak" -> {
+                                    navController.navigate("mesa_screen/$username") // Navegar a pantalla de "Komandak" pasando el nombre de usuario
+                                }
+                                "Eskaerak" -> {
+                                    // Lógica para la pantalla de "Eskaerak", si la tienes configurada
+                                    // Por ejemplo: navController.navigate("eskaerak_screen")
+                                }
+                                "Txata" -> {
+                                    navController.navigate("chat_screen") // Navegar a la pantalla de "Txata"
+                                }
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
@@ -465,7 +491,7 @@ fun BebidaScreen(navController: NavHostController, username: String, mesa: Strin
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
-                    onClick = { navController.popBackStack() }, // Acción de "Atzera"
+                    onClick = { navController.navigate("mesaScreen") { launchSingleTop = true } },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                     modifier = Modifier
                         .size(width = 150.dp, height = 50.dp),
@@ -474,7 +500,9 @@ fun BebidaScreen(navController: NavHostController, username: String, mesa: Strin
                     Text("Atzera", color = Color.White, fontSize = 16.sp)
                 }
                 Button(
-                    onClick = { /* Acción de "Hurrengoa" */ },
+                    onClick = {
+                        navController.navigate("primerosPlatos/$username/$mesa")
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF69472C)),
                     modifier = Modifier
                         .size(width = 150.dp, height = 50.dp),
@@ -656,8 +684,10 @@ fun PrimerosPlatosScreen(navController: NavHostController, username: String, mes
                     Text("Atzera", color = Color.White, fontSize = 16.sp)
                 }
                 Button(
-                    onClick = { /* Acción de "Hurrengoa" */ },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF69472C)),
+                    onClick = {
+                        navController.navigate("segundosPlatosScreen/$username/$mesa")
+                    }, // Navegación hacia SegundosPlatosScreen
+                    colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
                     modifier = Modifier
                         .size(width = 150.dp, height = 50.dp),
                     shape = RoundedCornerShape(8.dp)
@@ -668,6 +698,7 @@ fun PrimerosPlatosScreen(navController: NavHostController, username: String, mes
         }
     }
 }
+
 
 @Composable
 fun PlatoCard(
@@ -820,7 +851,7 @@ fun SegundosPlatosScreen(navController: NavHostController, username: String, mes
             // Espaciador flexible para empujar los botones hacia abajo
             Spacer(modifier = Modifier.weight(1f))
 
-            // Botones "Atzera" y "Hurrengoa" en la parte inferior
+            // Botones "Atzera" y "Eskaera Ikusi" en la parte inferior
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -828,7 +859,7 @@ fun SegundosPlatosScreen(navController: NavHostController, username: String, mes
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
-                    onClick = { navController.popBackStack() }, // Acción de "Atzera"
+                    onClick = { navController.popBackStack() }, // Volver a PrimerosPlatosScreen
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                     modifier = Modifier
                         .size(width = 150.dp, height = 50.dp),
@@ -837,14 +868,19 @@ fun SegundosPlatosScreen(navController: NavHostController, username: String, mes
                     Text("Atzera", color = Color.White, fontSize = 16.sp)
                 }
                 Button(
-                    onClick = { /* Acción de "Eskaera Ikusi" */ },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), // Verde
+                    onClick = {
+                        navController.navigate(
+                            "resumenPedidoScreen/${username}/${mesa}"
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                     modifier = Modifier
                         .size(width = 150.dp, height = 50.dp),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Eskaera Ikusi", color = Color.White, fontSize = 16.sp)
                 }
+
             }
         }
     }
@@ -986,7 +1022,12 @@ fun ResumenPedidoScreen(navController: NavHostController, pedido: List<Pair<Stri
                     Text("Atzera", color = Color.White, fontSize = 16.sp)
                 }
                 Button(
-                    onClick = { /* Acción de "Eskaera Sortu" */ },
+                    onClick = {
+                        // Guardar pedido (puedes manejar esta lógica aquí o en un ViewModel)
+                        navController.navigate("mainScreen") {
+                            popUpTo("mainScreen") { inclusive = true } // Limpiar la pila de navegación
+                        }
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), // Verde
                     modifier = Modifier
                         .size(width = 150.dp, height = 50.dp),
@@ -994,6 +1035,7 @@ fun ResumenPedidoScreen(navController: NavHostController, pedido: List<Pair<Stri
                 ) {
                     Text("Eskaera Sortu", color = Color.White, fontSize = 16.sp)
                 }
+
             }
         }
     }
@@ -1051,7 +1093,7 @@ fun ChatScreen(navController: NavHostController, mensajes: List<Pair<String, Boo
                     fontWeight = FontWeight.Bold
                 )
                 Button(
-                    onClick = { navController.popBackStack() },
+                    onClick = { navController.popBackStack() }, // Regresar a MainScreen
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -1112,7 +1154,6 @@ fun ChatScreen(navController: NavHostController, mensajes: List<Pair<String, Boo
         }
     }
 }
-
 
 @Composable
 fun ChatBubble(
