@@ -244,19 +244,15 @@ fun loginUser(
     onSuccess: (String) -> Unit,
     onError: (String) -> Unit
 ) {
-    val url = "http://10.0.2.2/login.php" // Reemplaza con tu URL
-    val json = JSONObject()
-    json.put("username", username)
-    json.put("password", password)
-
+    val url = "http://10.0.2.2/login.php" // URL local del servidor PHP
     val requestQueue = Volley.newRequestQueue(context)
     val stringRequest = object : StringRequest(
         Request.Method.POST, url,
         { response ->
-            if (response == "success") {
-                onSuccess(response) // Llamar a la función onSuccess si el login es exitoso
+            if (response.trim() == "success") {
+                onSuccess(response.trim()) // Llamar a la función onSuccess si el login es exitoso
             } else {
-                onError("Usuario o contraseña incorrectos.")
+                onError(response.trim()) // Mostrar mensaje del servidor en caso de error
             }
         },
         { error ->
@@ -265,8 +261,8 @@ fun loginUser(
     ) {
         override fun getParams(): Map<String, String> {
             return mapOf(
-                "username" to username,
-                "password" to password
+                "izena" to username,    // Usar 'izena' para enviar el nombre de usuario
+                "pasahitza" to password // Usar 'pasahitza' para enviar la contraseña
             )
         }
     }
@@ -563,7 +559,7 @@ fun BebidaScreen(navController: NavHostController, username: String, mesa: Strin
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
-                    onClick = { navController.navigate("mesaScreen") { launchSingleTop = true } },
+                    onClick = { navController.navigate("mesa_screen") { launchSingleTop = true } },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                     modifier = Modifier
                         .size(width = 150.dp, height = 50.dp),
@@ -747,7 +743,7 @@ fun PrimerosPlatosScreen(navController: NavHostController, username: String, mes
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
-                    onClick = { navController.popBackStack() }, // Acción de "Atzera"
+                    onClick = { navController.navigate("bebida_screen") { launchSingleTop = true } },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                     modifier = Modifier
                         .size(width = 150.dp, height = 50.dp),
