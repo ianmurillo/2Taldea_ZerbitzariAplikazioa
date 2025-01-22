@@ -200,7 +200,6 @@ fun LoginScreen(navController: NavHostController, context: Context) {
                 onClick = {
                     if (username.isNotBlank() && password.isNotBlank()) {
                         loading = true
-                        // Llamada a loginUser dentro de la corutina
                         coroutineScope.launch {
                             loginUser(
                                 context = context, // Pasamos el contexto
