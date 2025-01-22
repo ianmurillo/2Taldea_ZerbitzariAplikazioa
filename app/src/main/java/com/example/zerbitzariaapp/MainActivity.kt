@@ -28,13 +28,22 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.telecom.Call
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import com.android.volley.Request
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.android.volley.Response
 import org.json.JSONObject
+import java.io.IOException
+import javax.security.auth.callback.Callback
 
 
 class MainActivity : ComponentActivity() {
@@ -93,9 +102,6 @@ fun MyApp() {
                 pedido = pedido,
                 precioTotal = precioTotal
             )
-        }
-        composable("txata_screen") {
-            // Aquí va tu pantalla de txata_screen
         }
         composable("chat_screen") { backStackEntry ->
             ChatScreen(
@@ -184,6 +190,7 @@ fun LoginScreen(navController: NavHostController, context: Context) {
                     focusedLabelColor = Color(0xFF69472C),
                     unfocusedLabelColor = Color(0xFF755A3F)
                 ),
+                visualTransformation = PasswordVisualTransformation(), // Enmascara la contraseña
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -201,19 +208,34 @@ fun LoginScreen(navController: NavHostController, context: Context) {
                     if (username.isNotBlank() && password.isNotBlank()) {
                         loading = true
                         coroutineScope.launch {
-                            loginUser(
-                                context = context, // Pasamos el contexto
-                                username = username,
-                                password = password,
-                                onSuccess = {
-                                    loading = false
-                                    navController.navigate("main_screen/$username")
+                            val url = "http://10.0.2.2/login.php" // URL local del servidor PHP
+                            val requestQueue = Volley.newRequestQueue(context)
+                            val stringRequest = object : StringRequest(
+                                Request.Method.POST, url,
+                                { response ->
+                                    if (response.trim() == "success") {
+                                        loading = false
+                                        errorMessage = ""
+                                        navController.navigate("main_screen/$username") // Navegación al éxito
+                                    } else {
+                                        loading = false
+                                        errorMessage = "Usuario o contraseña incorrectos." // Mostrar mensaje del servidor
+                                    }
                                 },
-                                onError = {
+                                { error ->
                                     loading = false
-                                    errorMessage = it
+                                    errorMessage = "Error de conexión con el servidor." // Error de red
                                 }
-                            )
+                            ) {
+                                override fun getParams(): Map<String, String> {
+                                    return mapOf(
+                                        "izena" to username,    // Usar 'izena' para enviar el nombre de usuario
+                                        "pasahitza" to password // Usar 'pasahitza' para enviar la contraseña
+                                    )
+                                }
+                            }
+
+                            requestQueue.add(stringRequest)
                         }
                     } else {
                         errorMessage = "Por favor, ingrese un nombre de usuario y una contraseña."
@@ -233,40 +255,6 @@ fun LoginScreen(navController: NavHostController, context: Context) {
             }
         }
     }
-}
-
-// Función que realiza la solicitud HTTP
-fun loginUser(
-    context: Context,
-    username: String,
-    password: String,
-    onSuccess: (String) -> Unit,
-    onError: (String) -> Unit
-) {
-    val url = "http://10.0.2.2/login.php" // URL local del servidor PHP
-    val requestQueue = Volley.newRequestQueue(context)
-    val stringRequest = object : StringRequest(
-        Request.Method.POST, url,
-        { response ->
-            if (response.trim() == "success") {
-                onSuccess(response.trim()) // Llamar a la función onSuccess si el login es exitoso
-            } else {
-                onError(response.trim()) // Mostrar mensaje del servidor en caso de error
-            }
-        },
-        { error ->
-            onError("Error de conexión.")
-        }
-    ) {
-        override fun getParams(): Map<String, String> {
-            return mapOf(
-                "izena" to username,    // Usar 'izena' para enviar el nombre de usuario
-                "pasahitza" to password // Usar 'pasahitza' para enviar la contraseña
-            )
-        }
-    }
-
-    requestQueue.add(stringRequest)
 }
 
 

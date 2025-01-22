@@ -56,6 +56,8 @@ dependencies {
     implementation(libs.androidx.recyclerview)
     implementation(libs.firebase.database.ktx)
     implementation(libs.volley)
+    implementation(libs.androidx.espresso.core)
+    implementation(libs.androidx.espresso.core)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -69,5 +71,6 @@ dependencies {
     implementation ("io.ktor:ktor-client-serialization:2.3.0")
     implementation ("com.android.volley:volley:1.2.1")
     implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.0")
+    implementation ("io.coil-kt:coil-compose:2.4.0")
 }
 
