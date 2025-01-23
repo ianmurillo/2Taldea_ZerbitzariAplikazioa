@@ -556,7 +556,7 @@ fun BebidaScreen(navController: NavHostController, username: String, mesa: Strin
                 }
                 Button(
                     onClick = {
-                        navController.navigate("primerosPlatos/$username/$mesa")
+                        navController.navigate("primerosPlatosScreen/$username/$mesa")
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF69472C)),
                     modifier = Modifier
