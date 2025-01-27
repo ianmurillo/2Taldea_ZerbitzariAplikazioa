@@ -41,6 +41,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.android.volley.Response
+import com.android.volley.toolbox.JsonObjectRequest
 import org.json.JSONObject
 import java.io.IOException
 import javax.security.auth.callback.Callback
@@ -69,6 +70,18 @@ fun MyApp() {
             val username = backStackEntry.arguments?.getString("username") ?: ""
             MainScreen(navController = navController, username = username)
         }
+        // Pantalla de la selección de los platos (pedido)
+        composable("pedido_mesa_screen/{username}/{mesaId}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val mesaId = backStackEntry.arguments?.getString("mesaId") ?: ""
+            PedidoMesaScreen(navController, username, mesaId)
+        }
+        // Pantalla de resumen del pedido
+        composable("pedido_mesa_screen/{username}/{mesaId}") { backStackEntry ->
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            val mesaId = backStackEntry.arguments?.getString("mesaId") ?: ""
+            PedidoMesaScreen(navController, username, mesaId)
+        }
         composable("mesa_screen/{username}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
             MesaScreen(navController = navController, username = username)
@@ -90,18 +103,60 @@ fun MyApp() {
         }
         composable("resumenPedidoScreen/{username}/{mesa}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
-            val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
-            val pedido = listOf( // Ejemplo de pedido, reemplazar con los datos reales
-                "Labeko Oilaskoa" to 2,
-                "Legatza Plantxan" to 1
-            )
-            val precioTotal = pedido.sumOf { (_, cantidad) -> cantidad * 10.0 } // Precio ficticio
+            val mesaId = backStackEntry.arguments?.getString("mesa")?.toIntOrNull() ?: 0 // Convertir mesa a Int
 
-            ResumenPedidoScreen(
-                navController = navController,
-                pedido = pedido,
-                precioTotal = precioTotal
-            )
+            // Variables de estado para los datos
+            var pedido by remember { mutableStateOf(emptyList<Pair<String, Double>>()) }
+            var precioTotal by remember { mutableStateOf(0.0) }
+            var loading by remember { mutableStateOf(true) }
+            val context = LocalContext.current
+
+            // Obtener datos reales desde el servidor
+            LaunchedEffect(Unit) {
+                val url = "http://10.0.2.2/obtenerPedido.php"
+                val requestQueue = Volley.newRequestQueue(context)
+
+                val jsonObjectRequest = JsonObjectRequest(
+                    Request.Method.POST,
+                    url,
+                    JSONObject(mapOf("username" to username, "mesa_id" to mesaId)),
+                    { response ->
+                        val jsonArray = response.getJSONArray("pedido")
+                        val listaPedido = mutableListOf<Pair<String, Double>>()
+                        for (i in 0 until jsonArray.length()) {
+                            val item = jsonArray.getJSONObject(i)
+                            listaPedido.add(
+                                item.getString("plato") to item.getDouble("precio")
+                            )
+                        }
+                        pedido = listaPedido
+                        precioTotal = listaPedido.sumOf { it.second }
+                        loading = false
+                    },
+                    { error ->
+                        loading = false
+                        Toast.makeText(context, "Error al cargar el pedido", Toast.LENGTH_SHORT).show()
+                    }
+                )
+                requestQueue.add(jsonObjectRequest)
+            }
+
+            // Pantalla
+            if (loading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Color(0xFF69472C))
+                }
+            } else {
+                ResumenPedidoScreen(
+                    navController = navController,
+                    pedido = pedido,
+                    precioTotal = precioTotal,
+                    mesaId = mesaId
+                )
+            }
         }
         composable("chat_screen") { backStackEntry ->
             ChatScreen(
@@ -309,8 +364,7 @@ fun MainScreen(navController: NavHostController, username: String) {
                                     navController.navigate("mesa_screen/$username") // Navegar a pantalla de "Komandak" pasando el nombre de usuario
                                 }
                                 "Eskaerak" -> {
-                                    // Lógica para la pantalla de "Eskaerak", si la tienes configurada
-                                    // Por ejemplo: navController.navigate("eskaerak_screen")
+                                    navController.navigate("eskaera_mesa_screen/$username")
                                 }
                                 "Txata" -> {
                                     navController.navigate("chat_screen") // Navegar a la pantalla de "Txata"
@@ -350,6 +404,183 @@ fun MainScreen(navController: NavHostController, username: String) {
     }
 }
 
+@Composable
+fun EskaeraMesaScreen(navController: NavHostController, username: String) {
+    // Colores
+    val backgroundColor = Color(0xFFBFAB92)
+    val buttonColor = Color(0xFF69472C)
+    val textColor = Color(0xFFF8F3E9)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundColor)
+            .padding(16.dp)
+    ) {
+        // Encabezado: logo y nombre de usuario
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Logo en la esquina superior izquierda
+            Image(
+                painter = painterResource(id = R.drawable.logo_michisuji),
+                contentDescription = "Logo",
+                modifier = Modifier.size(80.dp) // Tamaño del logo ajustado
+            )
+
+            // Nombre del usuario en la esquina superior derecha
+            Text(
+                text = username, // Mostrar el nombre de usuario
+                color = Color(0xFF1C1107),
+                fontSize = 20.sp
+            )
+        }
+
+        // Contenido principal: título y botones centrados
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Título
+            Text(
+                text = "Mahaia aukeratu",
+                color = textColor,
+                fontSize = 24.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            // Botones para las mesas
+            for (row in 0..3) { // 4 filas (2 botones por fila)
+                Row(
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                ) {
+                    for (col in 1..2) { // 2 botones por fila
+                        val tableNumber = row * 2 + col
+                        Button(
+                            onClick = {
+                                // Navegación a la pantalla de PedidoMesaScreen con el número de mesa
+                                navController.navigate("pedido_mesa_screen/$username/Mesa$tableNumber")
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
+                            modifier = Modifier
+                                .size(100.dp), // Tamaño cuadrado para los botones
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("$tableNumber", color = textColor, fontSize = 20.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Botón "Atzera" abajo a la izquierda
+        Button(
+            onClick = { navController.popBackStack() }, // Volver a la pantalla anterior (MainScreen)
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+            modifier = Modifier
+                .align(Alignment.BottomStart) // Alineación abajo a la izquierda
+                .padding(8.dp)
+                .size(width = 150.dp, height = 50.dp),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text("Atzera", color = Color.White, fontSize = 16.sp)
+        }
+    }
+}
+
+
+@Composable
+fun PedidoMesaScreen(
+    navController: NavHostController,
+    username: String,
+    mesaId: String,
+    pedido: List<Pair<String, Double>> = emptyList()  // Recibir los datos de los pedidos como parámetro
+) {
+    val backgroundColor = Color(0xFFBFAB92)
+    val textColor = Color(0xFFF8F3E9)
+    val precioTotal = pedido.sumOf { (_, precio) -> precio }  // Calcular el precio total directamente
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundColor)
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Encabezado: Usuario y mesa
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Mesa: $mesaId",
+                    color = Color(0xFF1C1107),
+                    fontSize = 20.sp
+                )
+                Text(
+                    text = username,
+                    color = Color(0xFF1C1107),
+                    fontSize = 16.sp
+                )
+            }
+
+            // Título
+            Text(
+                text = "Eskaeraren Laburpena",
+                color = textColor,
+                fontSize = 24.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            // Mostrar los pedidos
+            pedido.forEach { (plato, precio) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(plato, color = textColor, fontSize = 18.sp)
+                    Text(String.format("%.2f €", precio), color = textColor, fontSize = 18.sp)
+                }
+            }
+
+            // Total
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "Prezio Guztira: ${String.format("%.2f €", precioTotal)}",
+                color = textColor,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            // Botón Atzera
+            Button(
+                onClick = { navController.popBackStack() },
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(top = 16.dp)
+            ) {
+                Text("Atzera", color = Color.White, fontSize = 16.sp)
+            }
+        }
+    }
+}
 
 
 @Composable
@@ -943,11 +1174,22 @@ fun SegundosPlatosScreen(navController: NavHostController, username: String, mes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ResumenPedidoScreen(navController: NavHostController, pedido: List<Pair<String, Int>>, precioTotal: Double) {
+fun ResumenPedidoScreen(
+    navController: NavHostController,
+    pedido: List<Pair<String, Double>>, // Cambiado a Double para incluir precios
+    precioTotal: Double,
+    mesaId: Int
+) {
     // Colores
     val backgroundColor = Color(0xFFBFAB92)
     val buttonColor = Color(0xFF69472C)
     val textColor = Color(0xFFF8F3E9)
+
+    // Estado para mostrar el indicador de carga
+    var loading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+
+    val coroutineScope = rememberCoroutineScope()
 
     Box(
         modifier = Modifier
@@ -975,14 +1217,9 @@ fun ResumenPedidoScreen(navController: NavHostController, pedido: List<Pair<Stri
                     horizontalAlignment = Alignment.End
                 ) {
                     Text(
-                        text = "Izena",
+                        text = "Mahaia: $mesaId",
                         color = Color(0xFF1C1107),
                         fontSize = 20.sp
-                    )
-                    Text(
-                        text = "Mahaia",
-                        color = Color(0xFF1C1107),
-                        fontSize = 16.sp
                     )
                 }
             }
@@ -1007,7 +1244,7 @@ fun ResumenPedidoScreen(navController: NavHostController, pedido: List<Pair<Stri
             ) {
                 Column {
                     // Listado de los platos
-                    pedido.forEach { (plato, cantidad) ->
+                    pedido.forEach { (plato, precio) ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1020,15 +1257,11 @@ fun ResumenPedidoScreen(navController: NavHostController, pedido: List<Pair<Stri
                                 color = textColor,
                                 fontSize = 18.sp
                             )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = cantidad.toString(),
-                                    color = textColor,
-                                    fontSize = 18.sp
-                                )
-                            }
+                            Text(
+                                text = String.format("%.2f€", precio),
+                                color = textColor,
+                                fontSize = 18.sp
+                            )
                         }
                         Divider(color = textColor, thickness = 1.dp)
                     }
@@ -1057,7 +1290,6 @@ fun ResumenPedidoScreen(navController: NavHostController, pedido: List<Pair<Stri
                 }
             }
 
-            // Espaciador flexible para empujar los botones hacia abajo
             Spacer(modifier = Modifier.weight(1f))
 
             // Botones "Atzera" y "Eskaera Sortu" en la parte inferior
@@ -1068,7 +1300,7 @@ fun ResumenPedidoScreen(navController: NavHostController, pedido: List<Pair<Stri
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
-                    onClick = { navController.popBackStack() }, // Acción de "Atzera"
+                    onClick = { navController.popBackStack() },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                     modifier = Modifier
                         .size(width = 150.dp, height = 50.dp),
@@ -1078,19 +1310,69 @@ fun ResumenPedidoScreen(navController: NavHostController, pedido: List<Pair<Stri
                 }
                 Button(
                     onClick = {
-                        // Guardar pedido (puedes manejar esta lógica aquí o en un ViewModel)
-                        navController.navigate("mainScreen") {
-                            popUpTo("mainScreen") { inclusive = true } // Limpiar la pila de navegación
+                        // Lógica para guardar el pedido
+                        loading = true
+                        coroutineScope.launch {
+                            try {
+                                val url = "http://10.0.2.2/guardar_pedido.php" // Cambia por tu URL
+                                val requestQueue = Volley.newRequestQueue(navController.context)
+
+                                pedido.forEach { (plato, precio) ->
+                                    val stringRequest = object : StringRequest(
+                                        Request.Method.POST, url,
+                                        { response ->
+                                            if (response.trim() != "success") {
+                                                errorMessage = "Error al guardar el pedido: $response"
+                                            }
+                                        },
+                                        { error ->
+                                            errorMessage = "Error de red: ${error.message}"
+                                        }
+                                    ) {
+                                        override fun getParams(): Map<String, String> {
+                                            return mapOf(
+                                                "eskaeraZenb" to "1234", // Genera un número único si es necesario
+                                                "izena" to plato,
+                                                "prezioa" to precio.toString(),
+                                                "mesa_id" to mesaId.toString()
+                                            )
+                                        }
+                                    }
+                                    requestQueue.add(stringRequest)
+                                }
+
+                                loading = false
+                                if (errorMessage.isEmpty()) {
+                                    navController.navigate("mainScreen") {
+                                        popUpTo("mainScreen") { inclusive = true }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                loading = false
+                                errorMessage = "Error inesperado: ${e.message}"
+                            }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), // Verde
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                     modifier = Modifier
                         .size(width = 150.dp, height = 50.dp),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Eskaera Sortu", color = Color.White, fontSize = 16.sp)
                 }
+            }
 
+            // Mostrar indicador de carga o mensaje de error
+            if (loading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            }
+            if (errorMessage.isNotEmpty()) {
+                Text(
+                    text = errorMessage,
+                    color = Color.Red,
+                    fontSize = 14.sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
             }
         }
     }
@@ -1313,27 +1595,31 @@ fun SegundosScreenPreview() {
     )
 }
 
-@Preview(showBackground = true,)
+@Preview(showBackground = true)
 @Composable
 fun ResumenPedidoPreview() {
     // Simulación de datos de ejemplo
     val pedidoEjemplo = listOf(
-        "Ura" to 3,
-        "Koka-Kola" to 1,
-        "Zesar Entsalada" to 2,
-        "Gazpatxoa" to 2,
-        "Labeko Oilaskoa" to 1,
-        "Beheiki Xerra" to 2,
-        "Barazki Lasagna" to 1
+        "Ura" to 3.0,
+        "Koka-Kola" to 1.0,
+        "Zesar Entsalada" to 2.0,
+        "Gazpatxoa" to 2.0,
+        "Labeko Oilaskoa" to 1.0,
+        "Beheiki Xerra" to 2.0,
+        "Barazki Lasagna" to 1.0
     )
-    val precioTotalEjemplo = 210.33
+    val precioTotalEjemplo = pedidoEjemplo.sumOf { (_, cantidad) -> cantidad * 10.0 } // Precio ficticio calculado
+    val mesaIdEjemplo = 1 // Ejemplo de ID de la mesa
 
-    // Llamada al Composable ResumenPedidoScreen con un NavHostController ficticio
-    ResumenPedidoScreen(
-        navController = rememberNavController(),
-        pedido = pedidoEjemplo,
-        precioTotal = precioTotalEjemplo
-    )
+    // Agregar un contenedor de tema si se necesita
+    MaterialTheme {
+        ResumenPedidoScreen(
+            navController = rememberNavController(), // Proveer un NavController ficticio
+            pedido = pedidoEjemplo,
+            precioTotal = precioTotalEjemplo,
+            mesaId = mesaIdEjemplo // Pasar el ID de la mesa al Composable
+        )
+    }
 }
 
 @Preview(showBackground = true)
