@@ -40,12 +40,16 @@ import com.android.volley.toolbox.Volley
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.android.volley.Response
 import com.android.volley.toolbox.JsonObjectRequest
 import org.json.JSONObject
 import java.io.IOException
 import javax.security.auth.callback.Callback
-
+import androidx.lifecycle.ViewModel
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,7 +66,6 @@ fun MyApp() {
 
     NavHost(navController = navController, startDestination = "login_screen") {
         composable("login_screen") {
-            // Pasamos el 'context' de la actividad (usando 'LocalContext.current') a LoginScreen
             val context = LocalContext.current
             LoginScreen(navController = navController, context = context)
         }
@@ -70,17 +73,14 @@ fun MyApp() {
             val username = backStackEntry.arguments?.getString("username") ?: ""
             MainScreen(navController = navController, username = username)
         }
-        // Pantalla de la selección de los platos (pedido)
-        composable("pedido_mesa_screen/{username}/{mesaId}") { backStackEntry ->
+        composable("eskaera_mesa_screen/{username}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
-            val mesaId = backStackEntry.arguments?.getString("mesaId") ?: ""
-            PedidoMesaScreen(navController, username, mesaId)
+            EskaeraMesaScreen(navController = navController, username = username)
         }
-        // Pantalla de resumen del pedido
         composable("pedido_mesa_screen/{username}/{mesaId}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
-            val mesaId = backStackEntry.arguments?.getString("mesaId") ?: ""
-            PedidoMesaScreen(navController, username, mesaId)
+            val mesaId = backStackEntry.arguments?.getString("mesaId")?.toIntOrNull() ?: 0  // Convertir a Int
+            PedidoMesaScreen(navController = navController, username = username, mesaId = mesaId)
         }
         composable("mesa_screen/{username}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
@@ -101,62 +101,31 @@ fun MyApp() {
             val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
             SegundosPlatosScreen(navController = navController, username = username, mesa = mesa)
         }
-        composable("resumenPedidoScreen/{username}/{mesa}") { backStackEntry ->
+        composable("resumenPedidoScreen/{username}/{mesaId}") { backStackEntry ->
             val username = backStackEntry.arguments?.getString("username") ?: ""
-            val mesaId = backStackEntry.arguments?.getString("mesa")?.toIntOrNull() ?: 0 // Convertir mesa a Int
+            val mesaId = backStackEntry.arguments?.getString("mesaId")?.toIntOrNull() ?: 0
 
-            // Variables de estado para los datos
             var pedido by remember { mutableStateOf(emptyList<Pair<String, Double>>()) }
             var precioTotal by remember { mutableStateOf(0.0) }
-            var loading by remember { mutableStateOf(true) }
-            val context = LocalContext.current
 
-            // Obtener datos reales desde el servidor
+            // Obtener el pedido (puedes hacer esto de otra manera según cómo lo pases)
             LaunchedEffect(Unit) {
-                val url = "http://10.0.2.2/obtenerPedido.php"
-                val requestQueue = Volley.newRequestQueue(context)
-
-                val jsonObjectRequest = JsonObjectRequest(
-                    Request.Method.POST,
-                    url,
-                    JSONObject(mapOf("username" to username, "mesa_id" to mesaId)),
-                    { response ->
-                        val jsonArray = response.getJSONArray("pedido")
-                        val listaPedido = mutableListOf<Pair<String, Double>>()
-                        for (i in 0 until jsonArray.length()) {
-                            val item = jsonArray.getJSONObject(i)
-                            listaPedido.add(
-                                item.getString("plato") to item.getDouble("precio")
-                            )
-                        }
-                        pedido = listaPedido
-                        precioTotal = listaPedido.sumOf { it.second }
-                        loading = false
-                    },
-                    { error ->
-                        loading = false
-                        Toast.makeText(context, "Error al cargar el pedido", Toast.LENGTH_SHORT).show()
-                    }
+                // Aquí solo simulamos que tienes los pedidos en una lista (puedes obtenerlos de una API o de un estado anterior)
+                pedido = listOf(
+                    "Plato 1" to 10.0,
+                    "Plato 2" to 20.0,
+                    "Bebida 1" to 5.0
                 )
-                requestQueue.add(jsonObjectRequest)
+                precioTotal = pedido.sumOf { it.second }
             }
 
-            // Pantalla
-            if (loading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = Color(0xFF69472C))
-                }
-            } else {
-                ResumenPedidoScreen(
-                    navController = navController,
-                    pedido = pedido,
-                    precioTotal = precioTotal,
-                    mesaId = mesaId
-                )
-            }
+            // Navegar a la pantalla de resumen
+            ResumenPedidoScreen(
+                navController = navController,
+                pedido = pedido,
+                precioTotal = precioTotal,
+                mesaId = mesaId
+            )
         }
         composable("chat_screen") { backStackEntry ->
             ChatScreen(
@@ -311,7 +280,6 @@ fun LoginScreen(navController: NavHostController, context: Context) {
         }
     }
 }
-
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -500,7 +468,7 @@ fun EskaeraMesaScreen(navController: NavHostController, username: String) {
 fun PedidoMesaScreen(
     navController: NavHostController,
     username: String,
-    mesaId: String,
+    mesaId: Int, // Cambiar tipo a Int
     pedido: List<Pair<String, Double>> = emptyList()  // Recibir los datos de los pedidos como parámetro
 ) {
     val backgroundColor = Color(0xFFBFAB92)
@@ -674,20 +642,40 @@ fun MesaScreen(navController: NavHostController, username: String) {
 }
 
 
+class BebidaViewModel : ViewModel() {
+    // Estado de las bebidas seleccionadas
+    var bebidas = mutableStateOf(
+        mapOf(
+            "Ura" to 0,
+            "Koka-Kola" to 0,
+            "Garagardoa" to 0,
+            "Laranja Zukua" to 0
+        )
+    )
+
+    // Función para actualizar la cantidad de una bebida
+    fun updateBebida(bebida: String, cantidad: Int) {
+        bebidas.value = bebidas.value.toMutableMap().apply {
+            this[bebida] = cantidad
+        }
+    }
+
+    // Función para obtener las bebidas seleccionadas
+    fun getBebidasSeleccionadas(): List<Pair<String, Int>> {
+        return bebidas.value.filter { it.value > 0 }
+            .map { it.key to it.value }
+    }
+}
 
 
 @Composable
 fun BebidaScreen(navController: NavHostController, username: String, mesa: String) {
-    // Colores
     val backgroundColor = Color(0xFFBFAB92)
     val buttonColor = Color(0xFF69472C)
     val textColor = Color(0xFFF8F3E9)
 
-    // Cantidades iniciales de cada bebida
-    var cantidadUra by remember { mutableStateOf(0) }
-    var cantidadKokaKola by remember { mutableStateOf(0) }
-    var cantidadGaragardoa by remember { mutableStateOf(0) }
-    var cantidadLaranjaZukua by remember { mutableStateOf(0) }
+    val bebidaViewModel: BebidaViewModel = viewModel()
+    val bebidas = bebidaViewModel.bebidas.value
 
     Box(
         modifier = Modifier
@@ -695,9 +683,7 @@ fun BebidaScreen(navController: NavHostController, username: String, mesa: Strin
             .background(backgroundColor)
             .padding(16.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             // Fila superior: logo y nombre del usuario y mesa
             Row(
                 modifier = Modifier
@@ -711,19 +697,9 @@ fun BebidaScreen(navController: NavHostController, username: String, mesa: Strin
                     contentDescription = "Logo",
                     modifier = Modifier.size(100.dp)
                 )
-                Column(
-                    horizontalAlignment = Alignment.End
-                ) {
-                    Text(
-                        text = username,
-                        color = Color(0xFF1C1107),
-                        fontSize = 20.sp
-                    )
-                    Text(
-                        text = mesa,
-                        color = Color(0xFF1C1107),
-                        fontSize = 16.sp
-                    )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(text = username, color = Color(0xFF1C1107), fontSize = 20.sp)
+                    Text(text = mesa, color = Color(0xFF1C1107), fontSize = 16.sp)
                 }
             }
 
@@ -754,8 +730,16 @@ fun BebidaScreen(navController: NavHostController, username: String, mesa: Strin
                         .fillMaxWidth()
                         .padding(bottom = 16.dp)
                 ) {
-                    BebidaCard("Ura", cantidadUra, { if (cantidadUra > 0) cantidadUra-- }, { cantidadUra++ }, buttonColor, textColor)
-                    BebidaCard("Koka-Kola", cantidadKokaKola, { if (cantidadKokaKola > 0) cantidadKokaKola-- }, { cantidadKokaKola++ }, buttonColor, textColor)
+                    BebidaCard("Ura", bebidas["Ura"] ?: 0, {
+                        if (bebidas["Ura"]!! > 0) bebidaViewModel.updateBebida("Ura", bebidas["Ura"]!! - 1)
+                    }, {
+                        bebidaViewModel.updateBebida("Ura", bebidas["Ura"]!! + 1)
+                    }, buttonColor, textColor)
+                    BebidaCard("Koka-Kola", bebidas["Koka-Kola"] ?: 0, {
+                        if (bebidas["Koka-Kola"]!! > 0) bebidaViewModel.updateBebida("Koka-Kola", bebidas["Koka-Kola"]!! - 1)
+                    }, {
+                        bebidaViewModel.updateBebida("Koka-Kola", bebidas["Koka-Kola"]!! + 1)
+                    }, buttonColor, textColor)
                 }
                 // Fila 2: Garagardoa y Laranja Zukua
                 Row(
@@ -764,8 +748,16 @@ fun BebidaScreen(navController: NavHostController, username: String, mesa: Strin
                         .fillMaxWidth()
                         .padding(bottom = 16.dp)
                 ) {
-                    BebidaCard("Garagardoa", cantidadGaragardoa, { if (cantidadGaragardoa > 0) cantidadGaragardoa-- }, { cantidadGaragardoa++ }, buttonColor, textColor)
-                    BebidaCard("Laranja Zukua", cantidadLaranjaZukua, { if (cantidadLaranjaZukua > 0) cantidadLaranjaZukua-- }, { cantidadLaranjaZukua++ }, buttonColor, textColor)
+                    BebidaCard("Garagardoa", bebidas["Garagardoa"] ?: 0, {
+                        if (bebidas["Garagardoa"]!! > 0) bebidaViewModel.updateBebida("Garagardoa", bebidas["Garagardoa"]!! - 1)
+                    }, {
+                        bebidaViewModel.updateBebida("Garagardoa", bebidas["Garagardoa"]!! + 1)
+                    }, buttonColor, textColor)
+                    BebidaCard("Laranja Zukua", bebidas["Laranja Zukua"] ?: 0, {
+                        if (bebidas["Laranja Zukua"]!! > 0) bebidaViewModel.updateBebida("Laranja Zukua", bebidas["Laranja Zukua"]!! - 1)
+                    }, {
+                        bebidaViewModel.updateBebida("Laranja Zukua", bebidas["Laranja Zukua"]!! + 1)
+                    }, buttonColor, textColor)
                 }
             }
 
@@ -773,7 +765,7 @@ fun BebidaScreen(navController: NavHostController, username: String, mesa: Strin
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 200.dp), // Ajuste para centrar mejor los botones
+                    .padding(top = 200.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Button(
@@ -787,7 +779,9 @@ fun BebidaScreen(navController: NavHostController, username: String, mesa: Strin
                 }
                 Button(
                     onClick = {
-                        navController.navigate("primerosPlatosScreen/$username/$mesa")
+                        // Pasar las bebidas seleccionadas a la siguiente pantalla
+                        val bebidasSeleccionadas = bebidaViewModel.getBebidasSeleccionadas()
+                        navController.navigate("primerosPlatosScreen/$username/$mesa/${bebidasSeleccionadas.joinToString(",")}")
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF69472C)),
                     modifier = Modifier
@@ -823,7 +817,12 @@ fun BebidaCard(
                 .background(buttonColor, shape = RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Text(nombre, color = textColor, fontSize = 14.sp, textAlign = TextAlign.Center)
+            Text(
+                text = nombre,
+                color = textColor,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
         }
 
         // Botones de aumentar y disminuir cantidad
@@ -855,20 +854,54 @@ fun BebidaCard(
     }
 }
 
+class PrimerosPlatosViewModel : ViewModel() {
+    // Variables para las cantidades de cada plato
+    var cantidadBarazkiZopa by mutableStateOf(0)
+    var cantidadZesarEntsalada by mutableStateOf(0)
+    var cantidadGazpatxoa by mutableStateOf(0)
+    var cantidadKalabazaKrema by mutableStateOf(0)
+
+    // Funciones para modificar las cantidades
+    fun increaseBarazkiZopa() {
+        cantidadBarazkiZopa++
+    }
+
+    fun decreaseBarazkiZopa() {
+        if (cantidadBarazkiZopa > 0) cantidadBarazkiZopa--
+    }
+
+    fun increaseZesarEntsalada() {
+        cantidadZesarEntsalada++
+    }
+
+    fun decreaseZesarEntsalada() {
+        if (cantidadZesarEntsalada > 0) cantidadZesarEntsalada--
+    }
+
+    fun increaseGazpatxoa() {
+        cantidadGazpatxoa++
+    }
+
+    fun decreaseGazpatxoa() {
+        if (cantidadGazpatxoa > 0) cantidadGazpatxoa--
+    }
+
+    fun increaseKalabazaKrema() {
+        cantidadKalabazaKrema++
+    }
+
+    fun decreaseKalabazaKrema() {
+        if (cantidadKalabazaKrema > 0) cantidadKalabazaKrema--
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PrimerosPlatosScreen(navController: NavHostController, username: String, mesa: String) {
+fun PrimerosPlatosScreen(navController: NavHostController, username: String, mesa: String, viewModel: PrimerosPlatosViewModel = viewModel()) {
     // Colores
     val backgroundColor = Color(0xFFBFAB92)
     val buttonColor = Color(0xFF69472C)
     val textColor = Color(0xFFF8F3E9)
-
-    // Cantidades iniciales de cada plato
-    var cantidadBarazkiZopa by remember { mutableStateOf(0) }
-    var cantidadZesarEntsalada by remember { mutableStateOf(0) }
-    var cantidadGazpatxoa by remember { mutableStateOf(0) }
-    var cantidadKalabazaKrema by remember { mutableStateOf(0) }
 
     Box(
         modifier = Modifier
@@ -935,8 +968,22 @@ fun PrimerosPlatosScreen(navController: NavHostController, username: String, mes
                         .fillMaxWidth()
                         .padding(bottom = 16.dp)
                 ) {
-                    PlatoCard("Barazki Zopa", cantidadBarazkiZopa, { if (cantidadBarazkiZopa > 0) cantidadBarazkiZopa-- }, { cantidadBarazkiZopa++ }, buttonColor, textColor)
-                    PlatoCard("Zesar Entsalada", cantidadZesarEntsalada, { if (cantidadZesarEntsalada > 0) cantidadZesarEntsalada-- }, { cantidadZesarEntsalada++ }, buttonColor, textColor)
+                    PlatoCard(
+                        "Barazki Zopa",
+                        viewModel.cantidadBarazkiZopa,
+                        { viewModel.decreaseBarazkiZopa() },
+                        { viewModel.increaseBarazkiZopa() },
+                        buttonColor,
+                        textColor
+                    )
+                    PlatoCard(
+                        "Zesar Entsalada",
+                        viewModel.cantidadZesarEntsalada,
+                        { viewModel.decreaseZesarEntsalada() },
+                        { viewModel.increaseZesarEntsalada() },
+                        buttonColor,
+                        textColor
+                    )
                 }
                 // Fila 2: Gazpatxoa y Kalabaza Krema
                 Row(
@@ -945,8 +992,22 @@ fun PrimerosPlatosScreen(navController: NavHostController, username: String, mes
                         .fillMaxWidth()
                         .padding(bottom = 16.dp)
                 ) {
-                    PlatoCard("Gazpatxoa", cantidadGazpatxoa, { if (cantidadGazpatxoa > 0) cantidadGazpatxoa-- }, { cantidadGazpatxoa++ }, buttonColor, textColor)
-                    PlatoCard("Kalabaza Krema", cantidadKalabazaKrema, { if (cantidadKalabazaKrema > 0) cantidadKalabazaKrema-- }, { cantidadKalabazaKrema++ }, buttonColor, textColor)
+                    PlatoCard(
+                        "Gazpatxoa",
+                        viewModel.cantidadGazpatxoa,
+                        { viewModel.decreaseGazpatxoa() },
+                        { viewModel.increaseGazpatxoa() },
+                        buttonColor,
+                        textColor
+                    )
+                    PlatoCard(
+                        "Kalabaza Krema",
+                        viewModel.cantidadKalabazaKrema,
+                        { viewModel.decreaseKalabazaKrema() },
+                        { viewModel.increaseKalabazaKrema() },
+                        buttonColor,
+                        textColor
+                    )
                 }
             }
 
@@ -972,7 +1033,7 @@ fun PrimerosPlatosScreen(navController: NavHostController, username: String, mes
                 Button(
                     onClick = {
                         navController.navigate("segundosPlatosScreen/$username/$mesa")
-                    }, // Navegación hacia SegundosPlatosScreen
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
                     modifier = Modifier
                         .size(width = 150.dp, height = 50.dp),
@@ -984,7 +1045,6 @@ fun PrimerosPlatosScreen(navController: NavHostController, username: String, mes
         }
     }
 }
-
 
 @Composable
 fun PlatoCard(
@@ -1040,19 +1100,59 @@ fun PlatoCard(
     }
 }
 
+class SegundosPlatosViewModel : ViewModel() {
+    // Variables para las cantidades de cada plato
+    var cantidadLabekoOilaskoa by mutableStateOf(0)
+    var cantidadLegatzaPlantxan by mutableStateOf(0)
+    var cantidadBeheikiXerra by mutableStateOf(0)
+    var cantidadBarazkiLasagna by mutableStateOf(0)
+
+    // Funciones para modificar las cantidades
+    fun increaseLabekoOilaskoa() {
+        cantidadLabekoOilaskoa++
+    }
+
+    fun decreaseLabekoOilaskoa() {
+        if (cantidadLabekoOilaskoa > 0) cantidadLabekoOilaskoa--
+    }
+
+    fun increaseLegatzaPlantxan() {
+        cantidadLegatzaPlantxan++
+    }
+
+    fun decreaseLegatzaPlantxan() {
+        if (cantidadLegatzaPlantxan > 0) cantidadLegatzaPlantxan--
+    }
+
+    fun increaseBeheikiXerra() {
+        cantidadBeheikiXerra++
+    }
+
+    fun decreaseBeheikiXerra() {
+        if (cantidadBeheikiXerra > 0) cantidadBeheikiXerra--
+    }
+
+    fun increaseBarazkiLasagna() {
+        cantidadBarazkiLasagna++
+    }
+
+    fun decreaseBarazkiLasagna() {
+        if (cantidadBarazkiLasagna > 0) cantidadBarazkiLasagna--
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SegundosPlatosScreen(navController: NavHostController, username: String, mesa: String) {
+fun SegundosPlatosScreen(
+    navController: NavHostController,
+    username: String,
+    mesa: String,
+    viewModel: SegundosPlatosViewModel = viewModel()
+) {
     // Colores
     val backgroundColor = Color(0xFFBFAB92)
     val buttonColor = Color(0xFF69472C)
     val textColor = Color(0xFFF8F3E9)
-
-    // Cantidades iniciales de cada plato
-    var cantidadLabekoOilaskoa by remember { mutableStateOf(0) }
-    var cantidadLegatzaPlantxan by remember { mutableStateOf(0) }
-    var cantidadBeheikiXerra by remember { mutableStateOf(0) }
-    var cantidadBarazkiLasagna by remember { mutableStateOf(0) }
 
     Box(
         modifier = Modifier
@@ -1119,8 +1219,22 @@ fun SegundosPlatosScreen(navController: NavHostController, username: String, mes
                         .fillMaxWidth()
                         .padding(bottom = 16.dp)
                 ) {
-                    PlatoCard("Labeko Oilaskoa", cantidadLabekoOilaskoa, { if (cantidadLabekoOilaskoa > 0) cantidadLabekoOilaskoa-- }, { cantidadLabekoOilaskoa++ }, buttonColor, textColor)
-                    PlatoCard("Legatza Plantxan", cantidadLegatzaPlantxan, { if (cantidadLegatzaPlantxan > 0) cantidadLegatzaPlantxan-- }, { cantidadLegatzaPlantxan++ }, buttonColor, textColor)
+                    PlatoCard(
+                        "Labeko Oilaskoa",
+                        viewModel.cantidadLabekoOilaskoa,
+                        { viewModel.decreaseLabekoOilaskoa() },
+                        { viewModel.increaseLabekoOilaskoa() },
+                        buttonColor,
+                        textColor
+                    )
+                    PlatoCard(
+                        "Legatza Plantxan",
+                        viewModel.cantidadLegatzaPlantxan,
+                        { viewModel.decreaseLegatzaPlantxan() },
+                        { viewModel.increaseLegatzaPlantxan() },
+                        buttonColor,
+                        textColor
+                    )
                 }
                 // Fila 2: Beheiki Xerra y Barazki Lasagna
                 Row(
@@ -1129,8 +1243,22 @@ fun SegundosPlatosScreen(navController: NavHostController, username: String, mes
                         .fillMaxWidth()
                         .padding(bottom = 16.dp)
                 ) {
-                    PlatoCard("Beheiki Xerra", cantidadBeheikiXerra, { if (cantidadBeheikiXerra > 0) cantidadBeheikiXerra-- }, { cantidadBeheikiXerra++ }, buttonColor, textColor)
-                    PlatoCard("Barazki Lasagna", cantidadBarazkiLasagna, { if (cantidadBarazkiLasagna > 0) cantidadBarazkiLasagna-- }, { cantidadBarazkiLasagna++ }, buttonColor, textColor)
+                    PlatoCard(
+                        "Beheiki Xerra",
+                        viewModel.cantidadBeheikiXerra,
+                        { viewModel.decreaseBeheikiXerra() },
+                        { viewModel.increaseBeheikiXerra() },
+                        buttonColor,
+                        textColor
+                    )
+                    PlatoCard(
+                        "Barazki Lasagna",
+                        viewModel.cantidadBarazkiLasagna,
+                        { viewModel.decreaseBarazkiLasagna() },
+                        { viewModel.increaseBarazkiLasagna() },
+                        buttonColor,
+                        textColor
+                    )
                 }
             }
 
@@ -1166,9 +1294,24 @@ fun SegundosPlatosScreen(navController: NavHostController, username: String, mes
                 ) {
                     Text("Eskaera Ikusi", color = Color.White, fontSize = 16.sp)
                 }
-
             }
         }
+    }
+}
+
+class PedidoViewModel : ViewModel() {
+    // Guardar los platos seleccionados (nombre, cantidad, precio)
+    private val _pedido = mutableStateOf<MutableList<Pair<String, Double>>>(mutableListOf())
+    val pedido: State<List<Pair<String, Double>>> = _pedido
+
+    // Añadir un plato o bebida al pedido
+    fun addToPedido(plato: String, precio: Double) {
+        _pedido.value.add(plato to precio)
+    }
+
+    // Obtener el precio total
+    fun calcularPrecioTotal(): Double {
+        return _pedido.value.sumOf { it.second }
     }
 }
 
@@ -1176,7 +1319,7 @@ fun SegundosPlatosScreen(navController: NavHostController, username: String, mes
 @Composable
 fun ResumenPedidoScreen(
     navController: NavHostController,
-    pedido: List<Pair<String, Double>>, // Cambiado a Double para incluir precios
+    pedido: List<Pair<String, Double>>, // Aquí ya estás recibiendo la lista de platos y precios
     precioTotal: Double,
     mesaId: Int
 ) {
@@ -1243,7 +1386,7 @@ fun ResumenPedidoScreen(
                     .padding(16.dp)
             ) {
                 Column {
-                    // Listado de los platos
+                    // Listado de los platos y bebidas
                     pedido.forEach { (plato, precio) ->
                         Row(
                             modifier = Modifier
@@ -1310,23 +1453,32 @@ fun ResumenPedidoScreen(
                 }
                 Button(
                     onClick = {
-                        // Lógica para guardar el pedido
                         loading = true
                         coroutineScope.launch {
                             try {
                                 val url = "http://10.0.2.2/guardar_pedido.php" // Cambia por tu URL
                                 val requestQueue = Volley.newRequestQueue(navController.context)
 
-                                pedido.forEach { (plato, precio) ->
+                                pedido.forEachIndexed { index, (plato, precio) ->
                                     val stringRequest = object : StringRequest(
                                         Request.Method.POST, url,
                                         { response ->
                                             if (response.trim() != "success") {
                                                 errorMessage = "Error al guardar el pedido: $response"
+                                                loading = false
+                                            }
+
+                                            // Si es el último elemento y no hay errores, navega
+                                            if (index == pedido.size - 1 && errorMessage.isEmpty()) {
+                                                loading = false
+                                                navController.navigate("main_screen") {
+                                                    popUpTo("main_screen") { inclusive = true }
+                                                }
                                             }
                                         },
                                         { error ->
                                             errorMessage = "Error de red: ${error.message}"
+                                            loading = false
                                         }
                                     ) {
                                         override fun getParams(): Map<String, String> {
@@ -1339,13 +1491,6 @@ fun ResumenPedidoScreen(
                                         }
                                     }
                                     requestQueue.add(stringRequest)
-                                }
-
-                                loading = false
-                                if (errorMessage.isEmpty()) {
-                                    navController.navigate("mainScreen") {
-                                        popUpTo("mainScreen") { inclusive = true }
-                                    }
                                 }
                             } catch (e: Exception) {
                                 loading = false
@@ -1525,8 +1670,6 @@ fun ChatBubble(
     }
 }
 
-
-
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview() {
@@ -1555,7 +1698,6 @@ fun MesaScreenPreview() {
     MesaScreen(navController = navController, username = username)
 }
 
-
 @Preview(showBackground = true)
 @Composable
 fun BebidaScreenPreview() {
@@ -1565,7 +1707,6 @@ fun BebidaScreenPreview() {
     val mesa = "Mesa 1"  // La mesa elegida por el usuario
     BebidaScreen(navController = navController, username = username, mesa = mesa)
 }
-
 
 @Preview(showBackground = true)
 @Composable
