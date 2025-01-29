@@ -26,13 +26,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
-import android.telecom.Call
 import android.util.Log
-import android.widget.Toast
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.platform.LocalContext
 import com.android.volley.Request
 import com.android.volley.toolbox.StringRequest
@@ -41,21 +37,37 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.android.volley.Response
-import com.android.volley.toolbox.JsonObjectRequest
-import org.json.JSONObject
 import java.io.IOException
-import javax.security.auth.callback.Callback
 import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import java.io.*
+import java.net.Socket
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MyApp()
+            val navController = rememberNavController()
+            val chatViewModel = viewModel<ChatViewModel>()
+
+            NavHost(navController, startDestination = "chat") {
+                composable("chat") { ChatScreen(navController, chatViewModel) }
+            }
         }
     }
 }
@@ -125,12 +137,6 @@ fun MyApp() {
                 pedido = pedido,
                 precioTotal = precioTotal,
                 mesaId = mesaId
-            )
-        }
-        composable("chat_screen") { backStackEntry ->
-            ChatScreen(
-                navController = navController,
-                mensajes = listOf(Pair("Hola!", true), Pair("¿Cómo estás?", false))
             )
         }
     }
@@ -280,7 +286,6 @@ fun LoginScreen(navController: NavHostController, context: Context) {
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -550,7 +555,6 @@ fun PedidoMesaScreen(
     }
 }
 
-
 @Composable
 fun MesaScreen(navController: NavHostController, username: String) {
     // Colores
@@ -641,7 +645,6 @@ fun MesaScreen(navController: NavHostController, username: String) {
     }
 }
 
-
 class BebidaViewModel : ViewModel() {
     // Estado de las bebidas seleccionadas
     var bebidas = mutableStateOf(
@@ -666,7 +669,6 @@ class BebidaViewModel : ViewModel() {
             .map { it.key to it.value }
     }
 }
-
 
 @Composable
 fun BebidaScreen(navController: NavHostController, username: String, mesa: String) {
@@ -1523,61 +1525,101 @@ fun ResumenPedidoScreen(
     }
 }
 
+
+class ChatViewModel : ViewModel() {
+    private var socket: Socket? = null
+    private var out: PrintWriter? = null
+    private var inStream: BufferedReader? = null
+
+    private val _messages = MutableStateFlow<List<Pair<String, Boolean>>>(emptyList())
+    val messages = _messages.asStateFlow()
+
+    fun connectToServer(serverIp: String = "192.168.115.158", port: Int = 5555) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                socket = Socket(serverIp, port)
+                out = PrintWriter(socket!!.getOutputStream(), true)
+                inStream = BufferedReader(InputStreamReader(socket!!.getInputStream()))
+
+                while (true) {
+                    val message = inStream?.readLine() ?: break
+                    if (message.isNotEmpty()) {
+                        _messages.value = listOf(Pair(message, false)) + _messages.value
+                    }
+                }
+            } catch (e: IOException) {
+                Log.e("ChatViewModel", "Error de conexión: ${e.message}")
+            }
+        }
+    }
+
+    fun sendMessage(user: String, message: String) {
+        if (message.isNotBlank()) {
+            out?.println("$user: $message")
+            _messages.value = listOf(Pair("$user: $message", true)) + _messages.value
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        socket?.close()
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(navController: NavHostController, mensajes: List<Pair<String, Boolean>>) {
-    // Colores del diseño
+fun ChatScreen(
+    navController: NavHostController,
+    viewModel: ChatViewModel = viewModel()  // Obtener el ViewModel
+) {
+    val messages by viewModel.messages.collectAsState()
+    var messageText by remember { mutableStateOf("") }
+
     val backgroundColor = Color(0xFFBFAB92)
     val bubbleColorSender = Color(0xFF69472C)
     val bubbleColorReceiver = Color(0xFFF8F3E9)
     val textColorSender = Color(0xFFF8F3E9)
     val textColorReceiver = Color(0xFF1C1107)
 
-    // Estado para el texto del mensaje
-    var messageText by remember { mutableStateOf("") }
-    var chatMessages by remember { mutableStateOf(mensajes) }
-
-    // Función para enviar mensaje
-    fun sendMessage() {
-        if (messageText.isNotEmpty()) {
-            chatMessages = listOf(Pair(messageText, true)) + chatMessages
-            messageText = ""  // Limpiar el campo de texto después de enviar
-        }
+    LaunchedEffect(Unit) {
+        viewModel.connectToServer()
     }
 
-    // Pantalla principal
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
             .padding(16.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Encabezado del chat
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Barra superior con el logo a la izquierda, el título centrado y el botón "Atzera" a la derecha
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween // Esto asegura que los elementos estén en los extremos
             ) {
+                // Logo en la izquierda
                 Image(
-                    painter = painterResource(id = R.drawable.logo_michisuji),
+                    painter = painterResource(id = R.drawable.logo_michisuji), // Asegúrate de tener un logo en res/drawable
                     contentDescription = "Logo",
-                    modifier = Modifier.size(50.dp)
+                    modifier = Modifier.size(100.dp) // Ajusta el tamaño del logo según necesites
                 )
+
+                // Título "Chat" centrado
                 Text(
                     text = "Chat",
-                    color = Color(0xFF1C1107),
                     fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f), // Esto empuja el título al centro
+                    textAlign = TextAlign.Center
                 )
+
+                // Botón "Atzera" a la derecha
                 Button(
-                    onClick = { navController.popBackStack() }, // Regresar a MainScreen
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                    shape = RoundedCornerShape(8.dp)
+                    onClick = { navController.navigate("main_screen") }, // Navega a MainScreen
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF69472C)
+                    )
                 ) {
                     Text("Atzera", color = Color.White)
                 }
@@ -1585,13 +1627,10 @@ fun ChatScreen(navController: NavHostController, mensajes: List<Pair<String, Boo
 
             // Lista de mensajes
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(bottom = 16.dp),
-                reverseLayout = true // Muestra los mensajes desde el final
+                modifier = Modifier.weight(1f),
+                reverseLayout = true
             ) {
-                items(chatMessages) { mensaje ->
+                items(messages) { mensaje ->
                     ChatBubble(
                         mensaje = mensaje.first,
                         isSender = mensaje.second,
@@ -1603,34 +1642,32 @@ fun ChatScreen(navController: NavHostController, mensajes: List<Pair<String, Boo
                 }
             }
 
-            // Input de texto
+            // Campo de texto para ingresar nuevos mensajes
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF69472C), shape = RoundedCornerShape(16.dp))
-                    .padding(8.dp),
+                    .background(Color(0xFF69472C), shape = RoundedCornerShape(16.dp)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextField(
                     value = messageText,
                     onValueChange = { messageText = it },
-                    placeholder = { Text("Idatzi mezua...", color = Color(0xFFF8F3E9)) },
+                    placeholder = { Text("Idatzi mezua...") },
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(Color.Transparent),
                     colors = TextFieldDefaults.textFieldColors(
-                        containerColor = Color.Transparent,
+                        cursorColor = Color.White,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent
                     ),
-                    modifier = Modifier.weight(1f)
+                    textStyle = TextStyle(color = Color.White)
                 )
-                IconButton(
-                    onClick = { sendMessage() },
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Send,
-                        contentDescription = "Bidali",
-                        tint = Color(0xFF4CAF50)
-                    )
+                IconButton(onClick = {
+                    viewModel.sendMessage("Usuario", messageText)
+                    messageText = ""
+                }) {
+                    Icon(imageVector = Icons.Default.Send, contentDescription = "Enviar", tint = Color.Green)
                 }
             }
         }
@@ -1749,7 +1786,7 @@ fun ResumenPedidoPreview() {
         "Beheiki Xerra" to 2.0,
         "Barazki Lasagna" to 1.0
     )
-    val precioTotalEjemplo = pedidoEjemplo.sumOf { (_, cantidad) -> cantidad * 10.0 } // Precio ficticio calculado
+    val precioTotalEjemplo = pedidoEjemplo.sumOf { (_, cantidad) -> cantidad } // Precio ficticio calculado
     val mesaIdEjemplo = 1 // Ejemplo de ID de la mesa
 
     // Agregar un contenedor de tema si se necesita
@@ -1766,20 +1803,21 @@ fun ResumenPedidoPreview() {
 @Preview(showBackground = true)
 @Composable
 fun PreviewChatScreen() {
-    // Lista de mensajes inicial
+    val navController = rememberNavController()
+
+    // Simulando algunos mensajes de ejemplo
     val mensajes = listOf(
-        Pair("¡Hola!", true),
-        Pair("Hola, ¿cómo estás?", false),
-        Pair("Todo bien, gracias", true),
-        Pair("Me alegro", false)
+        Pair("Kaixo!", true),
+        Pair("Kaixo, zer moduz?", false),
+        Pair("Ondo, eskerrik asko", true),
+        Pair("Pozten naiz", false)
     )
 
     ChatScreen(
-        navController = rememberNavController(),
-        mensajes = mensajes
+        navController = navController,
+        viewModel = viewModel() // Asegúrate de que el ViewModel se pase
     )
 }
-
 
 
 
