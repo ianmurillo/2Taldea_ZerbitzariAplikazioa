@@ -62,82 +62,80 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            // Inicializar el navController para la navegación
             val navController = rememberNavController()
-            val chatViewModel = viewModel<ChatViewModel>()
 
-            NavHost(navController, startDestination = "chat") {
-                composable("chat") { ChatScreen(navController, chatViewModel) }
+            // Definir las pantallas y la navegación
+            NavHost(navController = navController, startDestination = "login_screen") {
+                composable("login_screen") {
+                    val context = LocalContext.current
+                    LoginScreen(navController = navController, context = context)
+                }
+
+                // Pantalla principal después de iniciar sesión
+                composable("main_screen/{username}") { backStackEntry ->
+                    val username = backStackEntry.arguments?.getString("username") ?: ""
+                    MainScreen(navController = navController, username = username)
+                }
+                composable("chat_screen/{username}") { backStackEntry ->
+                    val username = backStackEntry.arguments?.getString("username") ?: ""
+                    ChatScreen(navController = navController, username = username)
+                }
+                composable("eskaera_mesa_screen/{username}") { backStackEntry ->
+                    val username = backStackEntry.arguments?.getString("username") ?: ""
+                    EskaeraMesaScreen(navController = navController, username = username)
+                }
+                composable("pedido_mesa_screen/{username}/{mesaId}") { backStackEntry ->
+                    val username = backStackEntry.arguments?.getString("username") ?: ""
+                    val mesaId = backStackEntry.arguments?.getString("mesaId")?.toIntOrNull() ?: 0
+                    PedidoMesaScreen(navController = navController, username = username, mesaId = mesaId)
+                }
+                composable("mesa_screen/{username}") { backStackEntry ->
+                    val username = backStackEntry.arguments?.getString("username") ?: ""
+                    MesaScreen(navController = navController, username = username)
+                }
+                composable("bebida_screen/{username}/{mesa}") { backStackEntry ->
+                    val username = backStackEntry.arguments?.getString("username") ?: ""
+                    val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
+                    BebidaScreen(navController = navController, username = username, mesa = mesa)
+                }
+                composable("primerosPlatosScreen/{username}/{mesa}") { backStackEntry ->
+                    val username = backStackEntry.arguments?.getString("username") ?: ""
+                    val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
+                    PrimerosPlatosScreen(navController = navController, username = username, mesa = mesa)
+                }
+                composable("segundosPlatosScreen/{username}/{mesa}") { backStackEntry ->
+                    val username = backStackEntry.arguments?.getString("username") ?: ""
+                    val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
+                    SegundosPlatosScreen(navController = navController, username = username, mesa = mesa)
+                }
+                composable("resumenPedidoScreen/{username}/{mesaId}") { backStackEntry ->
+                    val username = backStackEntry.arguments?.getString("username") ?: ""
+                    val mesaId = backStackEntry.arguments?.getString("mesaId")?.toIntOrNull() ?: 0
+
+                    var pedido by remember { mutableStateOf(emptyList<Pair<String, Double>>()) }
+                    var precioTotal by remember { mutableStateOf(0.0) }
+
+                    // Obtener el pedido (puedes hacer esto de otra manera según cómo lo pases)
+                    LaunchedEffect(Unit) {
+                        // Aquí solo simulamos que tienes los pedidos en una lista (puedes obtenerlos de una API o de un estado anterior)
+                        pedido = listOf(
+                            "Plato 1" to 10.0,
+                            "Plato 2" to 20.0,
+                            "Bebida 1" to 5.0
+                        )
+                        precioTotal = pedido.sumOf { it.second }
+                    }
+
+                    // Navegar a la pantalla de resumen
+                    ResumenPedidoScreen(
+                        navController = navController,
+                        pedido = pedido,
+                        precioTotal = precioTotal,
+                        mesaId = mesaId
+                    )
+                }
             }
-        }
-    }
-}
-
-@Composable
-fun MyApp() {
-    val navController = rememberNavController()
-
-    NavHost(navController = navController, startDestination = "login_screen") {
-        composable("login_screen") {
-            val context = LocalContext.current
-            LoginScreen(navController = navController, context = context)
-        }
-        composable("main_screen/{username}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            MainScreen(navController = navController, username = username)
-        }
-        composable("eskaera_mesa_screen/{username}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            EskaeraMesaScreen(navController = navController, username = username)
-        }
-        composable("pedido_mesa_screen/{username}/{mesaId}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            val mesaId = backStackEntry.arguments?.getString("mesaId")?.toIntOrNull() ?: 0  // Convertir a Int
-            PedidoMesaScreen(navController = navController, username = username, mesaId = mesaId)
-        }
-        composable("mesa_screen/{username}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            MesaScreen(navController = navController, username = username)
-        }
-        composable("bebida_screen/{username}/{mesa}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
-            BebidaScreen(navController = navController, username = username, mesa = mesa)
-        }
-        composable("primerosPlatosScreen/{username}/{mesa}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
-            PrimerosPlatosScreen(navController = navController, username = username, mesa = mesa)
-        }
-        composable("segundosPlatosScreen/{username}/{mesa}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            val mesa = backStackEntry.arguments?.getString("mesa") ?: ""
-            SegundosPlatosScreen(navController = navController, username = username, mesa = mesa)
-        }
-        composable("resumenPedidoScreen/{username}/{mesaId}") { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            val mesaId = backStackEntry.arguments?.getString("mesaId")?.toIntOrNull() ?: 0
-
-            var pedido by remember { mutableStateOf(emptyList<Pair<String, Double>>()) }
-            var precioTotal by remember { mutableStateOf(0.0) }
-
-            // Obtener el pedido (puedes hacer esto de otra manera según cómo lo pases)
-            LaunchedEffect(Unit) {
-                // Aquí solo simulamos que tienes los pedidos en una lista (puedes obtenerlos de una API o de un estado anterior)
-                pedido = listOf(
-                    "Plato 1" to 10.0,
-                    "Plato 2" to 20.0,
-                    "Bebida 1" to 5.0
-                )
-                precioTotal = pedido.sumOf { it.second }
-            }
-
-            // Navegar a la pantalla de resumen
-            ResumenPedidoScreen(
-                navController = navController,
-                pedido = pedido,
-                precioTotal = precioTotal,
-                mesaId = mesaId
-            )
         }
     }
 }
@@ -1570,7 +1568,8 @@ class ChatViewModel : ViewModel() {
 @Composable
 fun ChatScreen(
     navController: NavHostController,
-    viewModel: ChatViewModel = viewModel()  // Obtener el ViewModel
+    username: String, // Aquí agregamos el parámetro username
+    viewModel: ChatViewModel = viewModel() // Obtener el ViewModel
 ) {
     val messages by viewModel.messages.collectAsState()
     var messageText by remember { mutableStateOf("") }
@@ -1664,7 +1663,7 @@ fun ChatScreen(
                     textStyle = TextStyle(color = Color.White)
                 )
                 IconButton(onClick = {
-                    viewModel.sendMessage("Usuario", messageText)
+                    viewModel.sendMessage(username, messageText) // Usa el username aquí para enviar el mensaje
                     messageText = ""
                 }) {
                     Icon(imageVector = Icons.Default.Send, contentDescription = "Enviar", tint = Color.Green)
@@ -1813,11 +1812,17 @@ fun PreviewChatScreen() {
         Pair("Pozten naiz", false)
     )
 
+    // Usar un nombre de usuario de ejemplo
+    val username = "usuarioEjemplo"
+
+    // Pasar el username junto con el navController y viewModel
     ChatScreen(
         navController = navController,
+        username = username,  // Asegúrate de pasar el parámetro 'username'
         viewModel = viewModel() // Asegúrate de que el ViewModel se pase
     )
 }
+
 
 
 
