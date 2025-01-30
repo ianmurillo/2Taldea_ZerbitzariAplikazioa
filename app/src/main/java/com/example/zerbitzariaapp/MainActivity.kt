@@ -42,7 +42,6 @@ import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import java.io.*
 import java.net.Socket
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -55,7 +54,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-
 
 
 class MainActivity : ComponentActivity() {
@@ -1532,35 +1530,54 @@ class ChatViewModel : ViewModel() {
     private val _messages = MutableStateFlow<List<Pair<String, Boolean>>>(emptyList())
     val messages = _messages.asStateFlow()
 
+    private val _connectionState = MutableStateFlow(false)
+    val connectionState = _connectionState.asStateFlow()
+
     fun connectToServer(serverIp: String = "192.168.115.158", port: Int = 5555) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                socket = Socket(serverIp, port)
+                socket = Socket(serverIp, port).apply {
+                    soTimeout = 5000 // Tiempo de espera de 5 segundos para evitar bloqueos
+                }
                 out = PrintWriter(socket!!.getOutputStream(), true)
                 inStream = BufferedReader(InputStreamReader(socket!!.getInputStream()))
+                _connectionState.value = true
 
                 while (true) {
                     val message = inStream?.readLine() ?: break
                     if (message.isNotEmpty()) {
-                        _messages.value = listOf(Pair(message, false)) + _messages.value
+                        _messages.value = _messages.value + Pair(message, false)
                     }
                 }
             } catch (e: IOException) {
                 Log.e("ChatViewModel", "Error de conexión: ${e.message}")
+                _connectionState.value = false
             }
         }
     }
 
     fun sendMessage(user: String, message: String) {
-        if (message.isNotBlank()) {
-            out?.println("$user: $message")
-            _messages.value = listOf(Pair("$user: $message", true)) + _messages.value
+        if (message.isNotBlank() && _connectionState.value) {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    out?.println("$user: $message")
+                    _messages.value = _messages.value + Pair("$user: $message", true)
+                } catch (e: IOException) {
+                    Log.e("ChatViewModel", "Error enviando mensaje: ${e.message}")
+                }
+            }
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        socket?.close()
+        try {
+            socket?.close()
+            out?.close()
+            inStream?.close()
+        } catch (e: IOException) {
+            Log.e("ChatViewModel", "Error cerrando conexión: ${e.message}")
+        }
     }
 }
 
@@ -1606,7 +1623,7 @@ fun ChatScreen(
 
                 // Título "Chat" centrado
                 Text(
-                    text = "Chat",
+                    text = "Txata",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f), // Esto empuja el título al centro
@@ -1722,7 +1739,14 @@ fun LoginScreenPreview() {
 @Composable
 fun MainScreenPreview() {
     val navController = rememberNavController()
-    MainScreen(navController, username = "Izena")
+    MainScreen(navController, username = "Jon")
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PreviewEskaeraMesaScreen() {
+    val navController = rememberNavController()
+    EskaeraMesaScreen(navController = navController, username = "Jon")
 }
 
 @Preview(showBackground = true)
@@ -1730,7 +1754,7 @@ fun MainScreenPreview() {
 fun MesaScreenPreview() {
     val navController = rememberNavController()
     // Simulamos el nombre de usuario que se pasa desde el Login
-    val username = "Izena"
+    val username = "Jon"
     MesaScreen(navController = navController, username = username)
 }
 
@@ -1739,7 +1763,7 @@ fun MesaScreenPreview() {
 fun BebidaScreenPreview() {
     val navController = rememberNavController()
     // Simulamos el nombre de usuario y el número de mesa seleccionada
-    val username = "Izena"
+    val username = "Jon"
     val mesa = "Mesa 1"  // La mesa elegida por el usuario
     BebidaScreen(navController = navController, username = username, mesa = mesa)
 }
@@ -1753,7 +1777,7 @@ fun PrimerosScreenPreview() {
     // Llamamos a la función principal con datos ficticios
     PrimerosPlatosScreen(
         navController = fakeNavController,
-        username = "Izena",
+        username = "Jon",
         mesa = "Mahai 1"
     )
 }
@@ -1767,7 +1791,7 @@ fun SegundosScreenPreview() {
     // Llamamos a la función principal con datos ficticios
     SegundosPlatosScreen(
         navController = fakeNavController,
-        username = "Izena",
+        username = "Jon",
         mesa = "Mahai 1"
     )
 }
@@ -1777,13 +1801,13 @@ fun SegundosScreenPreview() {
 fun ResumenPedidoPreview() {
     // Simulación de datos de ejemplo
     val pedidoEjemplo = listOf(
-        "Ura" to 3.0,
-        "Koka-Kola" to 1.0,
-        "Zesar Entsalada" to 2.0,
-        "Gazpatxoa" to 2.0,
-        "Labeko Oilaskoa" to 1.0,
-        "Beheiki Xerra" to 2.0,
-        "Barazki Lasagna" to 1.0
+        "Ura" to 1.5,
+        "Koka-Kola" to 2.0,
+        "Zesar Entsalada" to 5.99,
+        "Gazpatxoa" to 3.99,
+        "Labeko Oilaskoa" to 10.99,
+        "Beheiki Xerra" to 15.99,
+        "Barazki Lasagna" to 11.99
     )
     val precioTotalEjemplo = pedidoEjemplo.sumOf { (_, cantidad) -> cantidad } // Precio ficticio calculado
     val mesaIdEjemplo = 1 // Ejemplo de ID de la mesa
